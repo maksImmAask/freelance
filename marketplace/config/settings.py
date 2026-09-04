@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     "apps.contracts",
     "apps.payments.apps.PaymentsConfig",
     "apps.reviews.apps.ReviewsConfig",
+
+    
     "apps.audit.apps.AuditConfig",
     "apps.chat.apps.ChatConfig",
     "rest_framework_simplejwt.token_blacklist",
