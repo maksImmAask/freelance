@@ -151,7 +151,38 @@ class MilestoneViewSet(viewsets.ModelViewSet):
             models.Q(contract__client=user)
             | models.Q(contract__freelancer=user)
         )
+    def update(self, request, *args, **kwargs):
+        milestone = self.get_object()
 
+        if request.user.role not in [
+            request.user.Role.CLIENT,
+            request.user.Role.ADMIN,
+        ]:
+            return Response(
+                {"detail": "Only client or admin can edit milestones."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return super().update(request, *args, **kwargs)
+
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
+
+    def destroy(self, request, *args, **kwargs):
+        milestone = self.get_object()
+
+        if request.user.role not in [
+            request.user.Role.CLIENT,
+            request.user.Role.ADMIN,
+        ]:
+            return Response(
+                {"detail": "Only client or admin can delete milestones."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return super().destroy(request, *args, **kwargs)
     def perform_create(self, serializer):
         contract_id = self.request.data.get("contract")
 

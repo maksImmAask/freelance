@@ -18,14 +18,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
-
+import os
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-mo^jal4%9@%6mnida&nhc74f*=t53nezhc8-11h4d%(a3kco)4'
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-!@#&$%&*()_+1234567890")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+DEBUG = os.environ.get(
+    "DJANGO_DEBUG",
+    "False"
+) == "True"
+ALLOWED_HOSTS = os.environ.get(
+    "DJANGO_ALLOWED_HOSTS",
+    "127.0.0.1,localhost",
+).split(",")
 
 AUTH_USER_MODEL = "accounts.User"
 # Application definition
@@ -37,18 +42,33 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
+    "apps.notifications.apps.NotificationsConfig",
     "rest_framework",
     "django_filters",
-
+    "apps.disputes.apps.DisputesConfig",
     "apps.accounts",
     "apps.projects",
     "apps.proposals",
     "apps.contracts",
     "apps.payments.apps.PaymentsConfig",
     "apps.reviews.apps.ReviewsConfig",
+    "apps.audit.apps.AuditConfig",
+    "apps.chat.apps.ChatConfig",
+    "rest_framework_simplejwt.token_blacklist",
+    "channels",
+    "apps.adminpanel.apps.AdminpanelConfig",
 ]
-
+ASGI_APPLICATION = "config.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                ("127.0.0.1", 6379)
+            ],
+        },
+    },
+}
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -151,4 +171,32 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",
+        "user": "120/min",
+    },
 }
+SECURE_SSL_REDIRECT = True
+
+SESSION_COOKIE_SECURE = True
+
+CSRF_COOKIE_SECURE = True
+
+SECURE_HSTS_SECONDS = 31536000
+
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+SECURE_REFERRER_POLICY = (
+    "same-origin"
+)
+
+X_FRAME_OPTIONS = "DENY"

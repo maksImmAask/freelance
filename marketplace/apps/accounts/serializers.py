@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
-from rest_framework import serializers
-
+from rest_framework import serializers # type: ignore
+from django.db.models import Avg
 from .models import ClientProfile, FreelancerProfile
 User = get_user_model()
 
@@ -46,6 +46,8 @@ class MeSerializer(serializers.ModelSerializer):
             "is_verified",
         ]
 class FreelancerProfileSerializer(serializers.ModelSerializer):
+    rating = serializers.SerializerMethodField()
+
     class Meta:
         model = FreelancerProfile
         fields = [
@@ -54,16 +56,26 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
             "specialization",
             "hourly_rate",
             "experience_years",
+            "rating",
             "created_at",
             "updated_at",
         ]
         read_only_fields = [
             "id",
+            "rating",
             "created_at",
             "updated_at",
         ]
 
+    def get_rating(self, obj):
+        result = obj.user.reviews_received.aggregate(
+            average=Avg("rating")
+        )
 
+        return round(
+            result["average"] or 0,
+            2,
+        )
 
 class ClientProfileSerializer(serializers.ModelSerializer):
     class Meta:

@@ -2,6 +2,10 @@ from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, BasePermission
 from django.db import models
 from .models import Category, Skill, Project
+from rest_framework.filters import (
+    SearchFilter,
+    OrderingFilter,
+)
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -57,6 +61,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         "title",
         "description",
         "skills__name",
+    ]
+    filter_backends = [
+        SearchFilter,
+        OrderingFilter,
     ]
 
     ordering_fields = [

@@ -81,7 +81,11 @@ class Transaction(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True
     )
-
+    idempotency_key = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+    )
     def __str__(self):
         return (
             f"{self.wallet.user.username} - "
