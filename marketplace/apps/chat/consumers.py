@@ -90,6 +90,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             models.Q(client=self.user)
             | models.Q(freelancer=self.user)
             | models.Q(
+                # администратор может видеть чат
                 client=self.user,
             )
         ).exists() or self.user.role == self.user.Role.ADMIN

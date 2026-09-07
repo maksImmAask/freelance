@@ -170,3 +170,39 @@ class Commission(models.Model):
             f"Commission #{self.id} - "
             f"{self.amount}"
         )
+class PaymentOperation(models.Model):
+
+    class Type(models.TextChoices):
+        FUND = "FUND", "Fund"
+        RELEASE = "RELEASE", "Release"
+        REFUND = "REFUND", "Refund"
+
+    key = models.UUIDField(
+        unique=True,
+    )
+
+    escrow = models.ForeignKey(
+        Escrow,
+        on_delete=models.CASCADE,
+        related_name="operations",
+    )
+
+    operation_type = models.CharField(
+        max_length=20,
+        choices=Type.choices,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "escrow",
+                    "operation_type",
+                ],
+                name="unique_escrow_operation_type",
+            )
+        ]

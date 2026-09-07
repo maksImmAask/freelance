@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db import models
 
 from rest_framework import serializers
-
+from .models import Contract
 from .models import Milestone
 from .models import Milestone
 class ContractSerializer(serializers.ModelSerializer):

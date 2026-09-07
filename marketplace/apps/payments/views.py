@@ -5,7 +5,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
+import uuid
 from .models import (
     Wallet,
     Transaction,
@@ -83,42 +83,67 @@ class EscrowViewSet(viewsets.ReadOnlyModelViewSet):
             models.Q(client=user)
             | models.Q(contract__freelancer=user)
         )
-
     @action(detail=True, methods=["post"])
     @db_transaction.atomic
     def fund(self, request, pk=None):
-        escrow = self.get_object()
+
+        escrow = (
+            Escrow.objects
+            .select_for_update()
+            .select_related("contract")
+            .get(pk=pk)
+        )
+        idempotency_key = request.headers.get(
+            "Idempotency-Key"
+        )
+
+        if idempotency_key:
+            try:
+                idempotency_key = uuid.UUID(
+                    idempotency_key
+                )
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid Idempotency-Key."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            existing = Transaction.objects.filter(
+                idempotency_key=idempotency_key
+            ).first()
+
+            if existing:
+                return Response(
+                    self.get_serializer(
+                        Escrow.objects.get(pk=existing.description.split("#")[-1])
+                    ).data
+                )
 
         if request.user != escrow.client:
             return Response(
-                {
-                    "detail": "Only the client can fund escrow."
-                },
+                {"detail": "Only the client can fund escrow."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         if escrow.status != Escrow.Status.PENDING:
             return Response(
-                {
-                    "detail": "Escrow must be pending."
-                },
+                {"detail": "Escrow must be pending."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        wallet = Wallet.objects.select_for_update().get(
-            user=request.user
+        wallet = (
+            Wallet.objects
+            .select_for_update()
+            .get(user=request.user)
         )
 
         if wallet.balance < escrow.amount:
             return Response(
-                {
-                    "detail": "Insufficient wallet balance."
-                },
+                {"detail": "Insufficient wallet balance."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         wallet.balance -= escrow.amount
-
         wallet.save(
             update_fields=[
                 "balance",
@@ -135,7 +160,6 @@ class EscrowViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         escrow.status = Escrow.Status.FUNDED
-
         escrow.save(
             update_fields=[
                 "status",
@@ -144,41 +168,45 @@ class EscrowViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         return Response(
-            self.get_serializer(escrow).data,
-            status=status.HTTP_200_OK,
+            self.get_serializer(escrow).data
         )
 
     @action(detail=True, methods=["post"])
     @db_transaction.atomic
     def release(self, request, pk=None):
-        escrow = self.get_object()
+
+        escrow = (
+            Escrow.objects
+            .select_for_update()
+            .select_related(
+                "contract",
+                "contract__freelancer",
+            )
+            .get(pk=pk)
+        )
 
         if request.user != escrow.client:
             return Response(
-                {
-                    "detail": "Only the client can release escrow."
-                },
+                {"detail": "Only the client can release escrow."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         if escrow.status != Escrow.Status.FUNDED:
             return Response(
-                {
-                    "detail": "Escrow must be funded first."
-                },
+                {"detail": "Escrow must be funded first."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        freelancer = escrow.contract.freelancer
+        commission = Commission.objects.get(
+            contract=escrow.contract
+        )
 
         freelancer_wallet = (
             Wallet.objects
             .select_for_update()
-            .get(user=freelancer)
-        )
-
-        commission = Commission.objects.get(
-            contract=escrow.contract
+            .get(
+                user=escrow.contract.freelancer
+            )
         )
 
         freelancer_amount = (
@@ -199,7 +227,9 @@ class EscrowViewSet(viewsets.ReadOnlyModelViewSet):
             transaction_type=Transaction.Type.PAYMENT,
             amount=freelancer_amount,
             status=Transaction.Status.COMPLETED,
-            description=f"Contract #{escrow.contract.id} payment",
+            description=(
+                f"Contract #{escrow.contract.id} payment"
+            ),
         )
 
         escrow.status = Escrow.Status.RELEASED
@@ -212,33 +242,35 @@ class EscrowViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         return Response(
-            self.get_serializer(escrow).data,
-            status=status.HTTP_200_OK,
+            self.get_serializer(escrow).data
         )
 
     @action(detail=True, methods=["post"])
     @db_transaction.atomic
     def refund(self, request, pk=None):
-        escrow = self.get_object()
+
+        escrow = (
+            Escrow.objects
+            .select_for_update()
+            .get(pk=pk)
+        )
 
         if request.user.role != request.user.Role.ADMIN:
             return Response(
-                {
-                    "detail": "Only admin can refund escrow."
-                },
+                {"detail": "Only admin can refund escrow."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         if escrow.status != Escrow.Status.FUNDED:
             return Response(
-                {
-                    "detail": "Only funded escrow can be refunded."
-                },
+                {"detail": "Only funded escrow can be refunded."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        wallet = Wallet.objects.select_for_update().get(
-            user=escrow.client
+        wallet = (
+            Wallet.objects
+            .select_for_update()
+            .get(user=escrow.client)
         )
 
         wallet.balance += escrow.amount
@@ -268,8 +300,7 @@ class EscrowViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         return Response(
-            self.get_serializer(escrow).data,
-            status=status.HTTP_200_OK,
+            self.get_serializer(escrow).data
         )
 
 
