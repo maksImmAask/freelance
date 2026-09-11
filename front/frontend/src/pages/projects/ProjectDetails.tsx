@@ -1,18 +1,16 @@
-import { useState } from "react";
+import React from "react";
 
 import {
+  Alert,
   Button,
   Card,
-  Col,
   Descriptions,
   Divider,
-  Empty,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
-  Row,
   Space,
   Spin,
   Tag,
@@ -27,16 +25,14 @@ import {
   SendOutlined,
 } from "@ant-design/icons";
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   useNavigate,
   useParams,
 } from "react-router-dom";
+
+import dayjs from "dayjs";
 
 import {
   deleteProjectRequest,
@@ -50,7 +46,45 @@ import type { ProposalFormData } from "../../types/proposal";
 
 import { useAuthStore } from "../../store/authStore";
 
-const { Title, Paragraph } = Typography;
+import type { ProjectStatus } from "../../types/project";
+
+import { AxiosError } from "axios";
+const { Title, Text, Paragraph } = Typography;
+
+const statusConfig: Record<
+  ProjectStatus,
+  {
+    color: string;
+    label: string;
+  }
+> = {
+  DRAFT: {
+    color: "default",
+    label: "Draft",
+  },
+  PUBLISHED: {
+    color: "blue",
+    label: "Published",
+  },
+  IN_PROGRESS: {
+    color: "orange",
+    label: "In Progress",
+  },
+  COMPLETED: {
+    color: "green",
+    label: "Completed",
+  },
+  CANCELLED: {
+    color: "red",
+    label: "Cancelled",
+  },
+};
+
+interface ProposalFormValues {
+  cover_letter: string;
+  price: number;
+  delivery_days: number;
+}
 
 export default function ProjectDetails() {
   const { id } = useParams();
@@ -59,13 +93,13 @@ export default function ProjectDetails() {
 
   const user = useAuthStore((state) => state.user);
 
-  const [proposalModalOpen, setProposalModalOpen] =
-    useState(false);
+  const projectId = Number(id);
 
   const [proposalForm] =
-    Form.useForm<ProposalFormData>();
+    Form.useForm<ProposalFormValues>();
 
-  const projectId = Number(id);
+  const [proposalModalOpen, setProposalModalOpen] =
+    React.useState(false);
 
   const {
     data: project,
@@ -77,44 +111,12 @@ export default function ProjectDetails() {
     enabled: Number.isFinite(projectId),
   });
 
-  const createProposalMutation = useMutation({
-    mutationFn: createProposalRequest,
-
-    onSuccess: () => {
-      message.success(
-        "Предложение успешно отправлено"
-      );
-
-      setProposalModalOpen(false);
-
-      proposalForm.resetFields();
-
-      queryClient.invalidateQueries({
-        queryKey: ["proposals"],
-      });
-    },
-
-    onError: (error: any) => {
-      const detail =
-        error?.response?.data?.detail;
-
-      if (detail) {
-        message.error(detail);
-      } else {
-        message.error(
-          "Не удалось отправить предложение"
-        );
-      }
-    },
-  });
   const publishMutation = useMutation({
     mutationFn: () =>
       publishProjectRequest(projectId),
 
     onSuccess: () => {
-      message.success(
-        "Project published successfully"
-      );
+      message.success("Project published");
 
       queryClient.invalidateQueries({
         queryKey: ["project", projectId],
@@ -125,13 +127,8 @@ export default function ProjectDetails() {
       });
     },
 
-    onError: (error: any) => {
-      const detail =
-        error?.response?.data?.detail;
-
-      message.error(
-        detail || "Failed to publish project"
-      );
+    onError: () => {
+      message.error("Не удалось опубликовать проект");
     },
   });
 
@@ -149,13 +146,54 @@ export default function ProjectDetails() {
       navigate("/projects");
     },
 
-    onError: (error: any) => {
-      const detail =
-        error?.response?.data?.detail;
+    onError: () => {
+      message.error("Не удалось удалить проект");
+    },
+  });
 
-      message.error(
-        detail || "Failed to delete project"
-      );
+  const createProposalMutation = useMutation({
+    mutationFn: (values: ProposalFormValues) => {
+      const data: ProposalFormData = {
+        project: projectId,
+        cover_letter: values.cover_letter,
+        price: String(values.price),
+        delivery_days: values.delivery_days,
+      };
+
+      return createProposalRequest(data);
+    },
+
+    onSuccess: () => {
+      message.success("Proposal sent successfully");
+
+      proposalForm.resetFields();
+      setProposalModalOpen(false);
+
+      queryClient.invalidateQueries({
+        queryKey: ["proposals"],
+      });
+    },
+
+    onError: (error) => {
+      if (error instanceof AxiosError) {
+        const data = error.response?.data;
+
+        if (data && typeof data === "object") {
+          const firstError = Object.values(data)[0];
+
+          if (Array.isArray(firstError)) {
+            message.error(String(firstError[0]));
+            return;
+          }
+
+          if (typeof firstError === "string") {
+            message.error(firstError);
+            return;
+          }
+        }
+      }
+
+      message.error("Не удалось отправить proposal");
     },
   });
 
@@ -173,19 +211,13 @@ export default function ProjectDetails() {
     );
   }
 
-
   if (isError || !project) {
     return (
-      <Card>
-        <Empty description="Project not found" />
-
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate("/projects")}
-        >
-          Back to projects
-        </Button>
-      </Card>
+      <Alert
+        type="error"
+        message="Project not found"
+        description="Не удалось загрузить проект."
+      />
     );
   }
 
@@ -196,101 +228,98 @@ export default function ProjectDetails() {
   const isAdmin =
     user?.role === "ADMIN";
 
-  const isFreelancer =
-    user?.role === "FREELANCER";
-
-  const canManage =
+  const canEdit =
     isOwner || isAdmin;
 
+  const canDelete =
+    isOwner || isAdmin;
+
+  const canPublish =
+    isOwner &&
+    project.status === "DRAFT";
+
   const canSendProposal =
-    isFreelancer &&
+    user?.role === "FREELANCER" &&
     project.status === "PUBLISHED";
 
+  const status =
+    statusConfig[project.status];
 
   const openProposalModal = () => {
     proposalForm.resetFields();
 
+    proposalForm.setFieldsValue({
+      price: Number(project.budget_min),
+      delivery_days: 7,
+    });
+
     setProposalModalOpen(true);
   };
 
+  const submitProposal = async () => {
+    try {
+      const values =
+        await proposalForm.validateFields();
 
-  const handleProposalSubmit = (
-    values: ProposalFormData
-  ) => {
-    createProposalMutation.mutate({
-      project: project.id,
-      cover_letter: values.cover_letter,
-      price: String(values.price),
-      delivery_days: Number(
-        values.delivery_days
-      ),
-    });
+      createProposalMutation.mutate(values);
+    } catch {
+      // Ant Design показывает ошибки формы самостоятельно.
+    }
   };
-
 
   return (
     <div>
-      {/* BACK */}
-
-      <Button
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate("/projects")}
+      <Space
         style={{
           marginBottom: 20,
         }}
       >
-        Back
-      </Button>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() =>
+            navigate("/projects")
+          }
+        >
+          Back
+        </Button>
+      </Space>
 
       <Card>
-        {/* HEADER */}
-
-        <Row
-          justify="space-between"
-          align="middle"
-          gutter={[16, 16]}
+        <Space
+          direction="vertical"
+          size="large"
+          style={{ width: "100%" }}
         >
-          <Col>
-            <Title
-              level={2}
-              style={{
-                marginBottom: 8,
-              }}
-            >
-              {project.title}
-            </Title>
-
-            <Space>
-              <Tag
-                color={
-                  project.status === "PUBLISHED"
-                    ? "green"
-                    : project.status ===
-                        "IN_PROGRESS"
-                      ? "blue"
-                      : project.status ===
-                          "COMPLETED"
-                        ? "success"
-                        : project.status ===
-                            "CANCELLED"
-                          ? "red"
-                          : "default"
-                }
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <Title
+                level={2}
+                style={{ marginBottom: 8 }}
               >
-                {project.status}
-              </Tag>
+                {project.title}
+              </Title>
 
-              <Tag>
-                {project.experience_level}
-              </Tag>
-            </Space>
-          </Col>
-
-          {/* CLIENT / ADMIN ACTIONS */}
-
-          {canManage && (
-            <Col>
               <Space>
+                <Tag color={status.color}>
+                  {status.label}
+                </Tag>
+
+                <Text type="secondary">
+                  Project #{project.id}
+                </Text>
+              </Space>
+            </div>
+
+            <Space wrap>
+              {canEdit && (
                 <Button
                   icon={<EditOutlined />}
                   onClick={() =>
@@ -301,15 +330,17 @@ export default function ProjectDetails() {
                 >
                   Edit
                 </Button>
+              )}
 
+              {canDelete && (
                 <Popconfirm
-                  title="Delete this project?"
+                  title="Delete project?"
                   description="This action cannot be undone."
+                  okText="Delete"
+                  cancelText="Cancel"
                   onConfirm={() =>
                     deleteMutation.mutate()
                   }
-                  okText="Delete"
-                  cancelText="Cancel"
                 >
                   <Button
                     danger
@@ -321,167 +352,130 @@ export default function ProjectDetails() {
                     Delete
                   </Button>
                 </Popconfirm>
-              </Space>
-            </Col>
-          )}
-        </Row>
+              )}
 
-        <Divider />
+              {canPublish && (
+                <Button
+                  type="primary"
+                  loading={
+                    publishMutation.isPending
+                  }
+                  onClick={() =>
+                    publishMutation.mutate()
+                  }
+                >
+                  Publish Project
+                </Button>
+              )}
 
-        {/* DESCRIPTION */}
+              {canSendProposal && (
+                <Button
+                  type="primary"
+                  icon={<SendOutlined />}
+                  onClick={openProposalModal}
+                >
+                  Send Proposal
+                </Button>
+              )}
+            </Space>
+          </div>
 
-        <Title level={4}>
-          Description
-        </Title>
+          <Divider />
 
-        <Paragraph>
-          {project.description}
-        </Paragraph>
+          <Descriptions
+            bordered
+            column={{
+              xs: 1,
+              sm: 2,
+              md: 3,
+            }}
+          >
+            <Descriptions.Item label="Category">
+              #{project.category}
+            </Descriptions.Item>
 
-        <Divider />
-
-        {/* INFORMATION */}
-
-        <Descriptions
-          column={{
-            xs: 1,
-            sm: 2,
-            md: 3,
-          }}
-          bordered
-        >
-          <Descriptions.Item label="Budget">
-            {project.budget_min} –{" "}
-            {project.budget_max}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Deadline">
-            {new Date(
-              project.deadline
-            ).toLocaleString()}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Experience">
-            {project.experience_level}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Category">
-            #{project.category}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Created">
-            {new Date(
-              project.created_at
-            ).toLocaleDateString()}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Project ID">
-            #{project.id}
-          </Descriptions.Item>
-        </Descriptions>
-
-        <Divider />
-
-        {/* SKILLS */}
-
-        <Title level={4}>
-          Skills
-        </Title>
-
-        <Space wrap>
-          {project.skills.length > 0 ? (
-            project.skills.map((skillId) => (
-              <Tag key={skillId}>
-                Skill #{skillId}
+            <Descriptions.Item label="Experience">
+              <Tag>
+                {project.experience_level}
               </Tag>
-            ))
-          ) : (
-            <Typography.Text type="secondary">
-              No skills specified
-            </Typography.Text>
-          )}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Client">
+              #{project.client}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Budget">
+              ${project.budget_min} — $
+              {project.budget_max}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Deadline">
+              {dayjs(project.deadline).format(
+                "DD.MM.YYYY HH:mm"
+              )}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Created">
+              {dayjs(project.created_at).format(
+                "DD.MM.YYYY HH:mm"
+              )}
+            </Descriptions.Item>
+          </Descriptions>
+
+          <div>
+            <Title level={4}>
+              Description
+            </Title>
+
+            <Paragraph>
+              {project.description}
+            </Paragraph>
+          </div>
+
+          <div>
+            <Title level={4}>
+              Skills
+            </Title>
+
+            <Space wrap>
+              {project.skills.map((skill) => (
+                <Tag key={skill}>
+                  #{skill}
+                </Tag>
+              ))}
+            </Space>
+          </div>
         </Space>
-
-        {/* PUBLISH */}
-
-        {isOwner &&
-          project.status === "DRAFT" && (
-            <>
-              <Divider />
-
-              <Button
-                type="primary"
-                loading={
-                  publishMutation.isPending
-                }
-                onClick={() =>
-                  publishMutation.mutate()
-                }
-              >
-                Publish Project
-              </Button>
-            </>
-          )}
-
-        {/* SEND PROPOSAL */}
-
-        {canSendProposal && (
-          <>
-            <Divider />
-
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={openProposalModal}
-            >
-              Send Proposal
-            </Button>
-          </>
-        )}
       </Card>
-
-      {/* =========================
-          PROPOSAL MODAL
-          ========================= */}
 
       <Modal
         title="Send Proposal"
         open={proposalModalOpen}
         onCancel={() => {
-          if (
-            createProposalMutation.isPending
-          ) {
-            return;
+          if (!createProposalMutation.isPending) {
+            setProposalModalOpen(false);
           }
-
-          setProposalModalOpen(false);
-          proposalForm.resetFields();
         }}
+        onOk={submitProposal}
         okText="Send Proposal"
         cancelText="Cancel"
         confirmLoading={
           createProposalMutation.isPending
         }
-        onOk={() => {
-          proposalForm.submit();
-        }}
-        destroyOnHidden
+        destroyOnClose
       >
         <Form
           form={proposalForm}
           layout="vertical"
-          onFinish={handleProposalSubmit}
         >
-          {/* COVER LETTER */}
-
           <Form.Item
-            name="cover_letter"
             label="Cover Letter"
+            name="cover_letter"
             rules={[
               {
                 required: true,
                 message:
-                  "Напиши сопроводительное письмо",
+                  "Введите cover letter",
               },
               {
                 min: 20,
@@ -492,66 +486,59 @@ export default function ProjectDetails() {
           >
             <Input.TextArea
               rows={6}
-              placeholder="Расскажи клиенту о своём опыте и почему ты подходишь для этого проекта..."
+              placeholder="Tell the client why you are the right freelancer..."
               showCount
               maxLength={5000}
             />
           </Form.Item>
 
-          {/* PRICE */}
-
           <Form.Item
-            name="price"
             label="Your Price"
+            name="price"
             rules={[
               {
                 required: true,
-                message: "Укажи цену",
+                message:
+                  "Введите цену",
               },
               {
                 type: "number",
                 min: 0,
                 message:
-                  "Цена должна быть положительной",
+                  "Цена не может быть отрицательной",
               },
             ]}
           >
             <InputNumber
-              style={{
-                width: "100%",
-              }}
-              placeholder="Например: 500"
+              style={{ width: "100%" }}
               min={0}
               precision={2}
+              addonAfter="$"
             />
           </Form.Item>
 
-          {/* DELIVERY */}
-
           <Form.Item
-            name="delivery_days"
             label="Delivery Days"
+            name="delivery_days"
             rules={[
               {
                 required: true,
                 message:
-                  "Укажи срок выполнения",
+                  "Введите количество дней",
               },
               {
                 type: "number",
                 min: 1,
                 message:
-                  "Минимальный срок — 1 день",
+                  "Минимум 1 день",
               },
             ]}
           >
             <InputNumber
-              style={{
-                width: "100%",
-              }}
-              placeholder="Например: 7"
+              style={{ width: "100%" }}
               min={1}
               precision={0}
+              addonAfter="days"
             />
           </Form.Item>
         </Form>

@@ -13,38 +13,34 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useNavigate } from "react-router-dom";
 
-import { getProposalsRequest } from "../../api/proposals";
+import { getContractsRequest } from "../../api/contracts";
 
-import type { ProposalStatus } from "../../types/proposal";
+import type { ContractStatus } from "../../types/contract";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 const statusConfig: Record<
-  ProposalStatus,
+  ContractStatus,
   {
     color: string;
     label: string;
   }
 > = {
-  PENDING: {
-    color: "gold",
-    label: "Pending",
+  ACTIVE: {
+    color: "blue",
+    label: "Active",
   },
-  ACCEPTED: {
+  COMPLETED: {
     color: "green",
-    label: "Accepted",
+    label: "Completed",
   },
-  REJECTED: {
+  CANCELLED: {
     color: "red",
-    label: "Rejected",
-  },
-  WITHDRAWN: {
-    color: "default",
-    label: "Withdrawn",
+    label: "Cancelled",
   },
 };
 
-export default function Proposals() {
+export default function Contracts() {
   const navigate = useNavigate();
 
   const {
@@ -52,8 +48,8 @@ export default function Proposals() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["proposals"],
-    queryFn: getProposalsRequest,
+    queryKey: ["contracts"],
+    queryFn: getContractsRequest,
   });
 
   if (isLoading) {
@@ -74,65 +70,72 @@ export default function Proposals() {
     return (
       <Alert
         type="error"
-        message="Не удалось загрузить предложения"
-        description="Проверь Django backend и авторизацию."
+        message="Не удалось загрузить контракты"
       />
     );
   }
 
-  const proposals = data?.results ?? [];
+  const contracts =
+    data?.results ?? [];
 
   return (
     <div>
       <Title level={2}>
-        Proposals
+        Contracts
       </Title>
 
       <Text type="secondary">
-        Здесь отображаются предложения по проектам.
+        Your active and completed contracts.
       </Text>
 
       <div style={{ marginTop: 24 }}>
-        {proposals.length === 0 ? (
+        {contracts.length === 0 ? (
           <Card>
-            <Empty
-              description="Предложений пока нет"
-            />
+            <Empty description="Контрактов пока нет" />
           </Card>
         ) : (
           <Row gutter={[16, 16]}>
-            {proposals.map((proposal) => {
+            {contracts.map((contract) => {
               const status =
-                statusConfig[proposal.status];
+                statusConfig[
+                  contract.status
+                ];
 
               return (
                 <Col
                   xs={24}
                   sm={12}
                   lg={8}
-                  key={proposal.id}
+                  key={contract.id}
                 >
                   <Card
                     hoverable
                     onClick={() =>
                       navigate(
-                        `/proposals/${proposal.id}`
+                        `/contracts/${contract.id}`
                       )
                     }
                   >
                     <div
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        justifyContent:
+                          "space-between",
+                        alignItems:
+                          "center",
                         marginBottom: 16,
                       }}
                     >
                       <Text strong>
-                        Proposal #{proposal.id}
+                        Contract #
+                        {contract.id}
                       </Text>
 
-                      <Tag color={status.color}>
+                      <Tag
+                        color={
+                          status.color
+                        }
+                      >
                         {status.label}
                       </Tag>
                     </div>
@@ -149,7 +152,23 @@ export default function Proposals() {
                       <br />
 
                       <Text strong>
-                        #{proposal.project}
+                        #{contract.project}
+                      </Text>
+                    </div>
+
+                    <div
+                      style={{
+                        marginBottom: 12,
+                      }}
+                    >
+                      <Text type="secondary">
+                        Client
+                      </Text>
+
+                      <br />
+
+                      <Text>
+                        #{contract.client}
                       </Text>
                     </div>
 
@@ -165,31 +184,29 @@ export default function Proposals() {
                       <br />
 
                       <Text>
-                        #{proposal.freelancer}
+                        #{contract.freelancer}
                       </Text>
                     </div>
-
-                    <Paragraph
-                      ellipsis={{
-                        rows: 3,
-                      }}
-                    >
-                      {proposal.cover_letter}
-                    </Paragraph>
 
                     <div
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
-                        marginTop: 16,
+                        justifyContent:
+                          "space-between",
+                        marginTop: 20,
                       }}
                     >
                       <Text strong>
-                        ${proposal.price}
+                        $
+                        {
+                          contract.total_amount
+                        }
                       </Text>
 
-                      <Text>
-                        {proposal.delivery_days} days
+                      <Text type="secondary">
+                        {new Date(
+                          contract.deadline
+                        ).toLocaleDateString()}
                       </Text>
                     </div>
                   </Card>

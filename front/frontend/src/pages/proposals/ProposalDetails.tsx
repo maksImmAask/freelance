@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Descriptions,
+  Divider,
   Popconfirm,
   Space,
   Spin,
@@ -10,18 +11,35 @@ import {
   Typography,
   message,
 } from "antd";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
 
 import {
-  acceptProposalRequest,
+  ArrowLeftOutlined,
+  CheckOutlined,
+  CloseOutlined,
+} from "@ant-design/icons";
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+
+import {
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+
+import {
   getProposalRequest,
+  acceptProposalRequest,
   rejectProposalRequest,
 } from "../../api/proposals";
+
 import { useAuthStore } from "../../store/authStore";
+
 import type { ProposalStatus } from "../../types/proposal";
 
-const { Title, Paragraph } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 const statusConfig: Record<
   ProposalStatus,
@@ -53,7 +71,9 @@ export default function ProposalDetails() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore(
+    (state) => state.user
+  );
 
   const proposalId = Number(id);
 
@@ -63,7 +83,8 @@ export default function ProposalDetails() {
     isError,
   } = useQuery({
     queryKey: ["proposal", proposalId],
-    queryFn: () => getProposalRequest(proposalId),
+    queryFn: () =>
+      getProposalRequest(proposalId),
     enabled: Number.isFinite(proposalId),
   });
 
@@ -73,7 +94,7 @@ export default function ProposalDetails() {
 
     onSuccess: () => {
       message.success(
-        "Предложение принято. Контракт создан."
+        "Proposal accepted"
       );
 
       queryClient.invalidateQueries({
@@ -87,11 +108,15 @@ export default function ProposalDetails() {
       queryClient.invalidateQueries({
         queryKey: ["contracts"],
       });
+
+      queryClient.invalidateQueries({
+        queryKey: ["projects"],
+      });
     },
 
     onError: () => {
       message.error(
-        "Не удалось принять предложение"
+        "Не удалось принять proposal"
       );
     },
   });
@@ -101,7 +126,9 @@ export default function ProposalDetails() {
       rejectProposalRequest(proposalId),
 
     onSuccess: () => {
-      message.success("Предложение отклонено");
+      message.success(
+        "Proposal rejected"
+      );
 
       queryClient.invalidateQueries({
         queryKey: ["proposal", proposalId],
@@ -114,7 +141,7 @@ export default function ProposalDetails() {
 
     onError: () => {
       message.error(
-        "Не удалось отклонить предложение"
+        "Не удалось отклонить proposal"
       );
     },
   });
@@ -125,7 +152,7 @@ export default function ProposalDetails() {
         style={{
           display: "flex",
           justifyContent: "center",
-          padding: 60,
+          padding: 80,
         }}
       >
         <Spin size="large" />
@@ -137,7 +164,7 @@ export default function ProposalDetails() {
     return (
       <Alert
         type="error"
-        message="Предложение не найдено"
+        message="Proposal not found"
       />
     );
   }
@@ -145,114 +172,164 @@ export default function ProposalDetails() {
   const status =
     statusConfig[proposal.status];
 
-  const isClient = user?.role === "CLIENT";
-  const isAdmin = user?.role === "ADMIN";
-  const isPending = proposal.status === "PENDING";
+  const canAccept =
+    user?.role === "CLIENT" &&
+    proposal.status === "PENDING";
+
+  const canReject =
+    user?.role === "CLIENT" &&
+    proposal.status === "PENDING";
+
+  const canEdit =
+    user?.role === "FREELANCER" &&
+    user.id === proposal.freelancer &&
+    proposal.status === "PENDING";
 
   return (
     <div>
       <Button
-        type="link"
-        onClick={() => navigate(-1)}
-        style={{ paddingLeft: 0 }}
+        icon={<ArrowLeftOutlined />}
+        onClick={() =>
+          navigate("/proposals")
+        }
+        style={{ marginBottom: 20 }}
       >
-        ← Назад
+        Back
       </Button>
 
-      <Card style={{ marginTop: 8 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 24,
-          }}
+      <Card>
+        <Space
+          direction="vertical"
+          size="large"
+          style={{ width: "100%" }}
         >
-          <Title
-            level={2}
-            style={{ margin: 0 }}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
           >
-            Proposal #{proposal.id}
-          </Title>
-
-          <Tag color={status.color}>
-            {status.label}
-          </Tag>
-        </div>
-
-        <Descriptions
-          bordered
-          column={1}
-        >
-          <Descriptions.Item label="Project">
-            #{proposal.project}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Freelancer">
-            #{proposal.freelancer}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Price">
-            ${proposal.price}
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Delivery">
-            {proposal.delivery_days} days
-          </Descriptions.Item>
-
-          <Descriptions.Item label="Created">
-            {new Date(
-              proposal.created_at
-            ).toLocaleString()}
-          </Descriptions.Item>
-        </Descriptions>
-
-        <Card
-          type="inner"
-          title="Cover Letter"
-          style={{ marginTop: 24 }}
-        >
-          <Paragraph>
-            {proposal.cover_letter}
-          </Paragraph>
-        </Card>
-
-        {isPending && (isClient || isAdmin) && (
-          <Space style={{ marginTop: 24 }}>
-            <Popconfirm
-              title="Принять предложение?"
-              description="После принятия будет создан контракт."
-              onConfirm={() =>
-                acceptMutation.mutate()
-              }
-              okText="Да"
-              cancelText="Нет"
+            <Title
+              level={2}
+              style={{ margin: 0 }}
             >
-              <Button
-                type="primary"
-                loading={acceptMutation.isPending}
-              >
-                Accept Proposal
-              </Button>
-            </Popconfirm>
+              Proposal #{proposal.id}
+            </Title>
 
-            <Popconfirm
-              title="Отклонить предложение?"
-              onConfirm={() =>
-                rejectMutation.mutate()
-              }
-              okText="Да"
-              cancelText="Нет"
+            <Tag
+              color={status.color}
             >
-              <Button
-                danger
-                loading={rejectMutation.isPending}
-              >
-                Reject
-              </Button>
-            </Popconfirm>
-          </Space>
-        )}
+              {status.label}
+            </Tag>
+          </div>
+
+          <Divider />
+
+          <Descriptions
+            bordered
+            column={1}
+          >
+            <Descriptions.Item label="Project">
+              #{proposal.project}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Freelancer">
+              #{proposal.freelancer}
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Price">
+              <Text strong>
+                ${proposal.price}
+              </Text>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Delivery">
+              {proposal.delivery_days} days
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Created">
+              {new Date(
+                proposal.created_at
+              ).toLocaleString()}
+            </Descriptions.Item>
+          </Descriptions>
+
+          <div>
+            <Title level={4}>
+              Cover Letter
+            </Title>
+
+            <Paragraph>
+              {proposal.cover_letter}
+            </Paragraph>
+          </div>
+
+          {(canAccept ||
+            canReject ||
+            canEdit) && (
+            <>
+              <Divider />
+
+              <Space wrap>
+                {canAccept && (
+                  <Popconfirm
+                    title="Accept this proposal?"
+                    description="A contract will be created."
+                    okText="Accept"
+                    cancelText="Cancel"
+                    onConfirm={() =>
+                      acceptMutation.mutate()
+                    }
+                  >
+                    <Button
+                      type="primary"
+                      icon={
+                        <CheckOutlined />
+                      }
+                      loading={
+                        acceptMutation.isPending
+                      }
+                    >
+                      Accept Proposal
+                    </Button>
+                  </Popconfirm>
+                )}
+
+                {canReject && (
+                  <Popconfirm
+                    title="Reject this proposal?"
+                    okText="Reject"
+                    cancelText="Cancel"
+                    onConfirm={() =>
+                      rejectMutation.mutate()
+                    }
+                  >
+                    <Button
+                      danger
+                      icon={
+                        <CloseOutlined />
+                      }
+                      loading={
+                        rejectMutation.isPending
+                      }
+                    >
+                      Reject
+                    </Button>
+                  </Popconfirm>
+                )}
+
+                {canEdit && (
+                  <Button>
+                    Edit Proposal
+                  </Button>
+                )}
+              </Space>
+            </>
+          )}
+        </Space>
       </Card>
     </div>
   );

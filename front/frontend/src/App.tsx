@@ -1,23 +1,39 @@
 import { useEffect } from "react";
-import { BrowserRouter } from "react-router-dom";
 
 import AppRoutes from "./routes/AppRoutes";
+
 import { useAuthStore } from "./store/authStore";
 
-function App() {
+export default function App() {
   const loadUser = useAuthStore(
     (state) => state.loadUser
+  );
+
+  const logout = useAuthStore(
+    (state) => state.logout
   );
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
 
-  return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
-  );
-}
+  useEffect(() => {
+    const handleLogout = () => {
+      logout();
+    };
 
-export default App;
+    window.addEventListener(
+      "auth:logout",
+      handleLogout
+    );
+
+    return () => {
+      window.removeEventListener(
+        "auth:logout",
+        handleLogout
+      );
+    };
+  }, [logout]);
+
+  return <AppRoutes />;
+}

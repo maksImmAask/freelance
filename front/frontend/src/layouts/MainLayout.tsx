@@ -7,6 +7,7 @@ import {
   ProjectOutlined,
   UserOutlined,
   LogoutOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 import {
   Avatar,
@@ -47,6 +48,16 @@ export default function MainLayout() {
           label: "Projects",
         },
         {
+          key: "/payments",
+          icon: <WalletOutlined />,
+          label: "Payments",
+        },
+        {
+          key: "/reviews",
+          icon: <FileDoneOutlined />,
+          label: "Reviews",
+        },
+        {
           key: "/proposals",
           icon: <FolderOpenOutlined />,
           label: "My Proposals",
@@ -80,6 +91,16 @@ export default function MainLayout() {
           key: "/dashboard",
           icon: <AppstoreOutlined />,
           label: "Dashboard",
+        },
+        {
+          key: "/payments",
+          icon: <WalletOutlined />,
+          label: "Payments",
+        },
+        {
+          key: "/reviews",
+          icon: <FileDoneOutlined />,
+          label: "Reviews",
         },
         {
           key: "/projects",

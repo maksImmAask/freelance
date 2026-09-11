@@ -1,142 +1,172 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
+
+import AuthLayout from "../layouts/AuthLayout";
+import MainLayout from "../layouts/MainLayout";
+import AdminLayout from "../layouts/AdminLayout";
 
 import Login from "../pages/auth/Login";
-import Dashboard from "../pages/dashboard/Dashboard";
+import Register from "../pages/auth/Register";
 
-import MainLayout from "../layouts/MainLayout";
-import Proposals from "../pages/proposals/Proposals";
-import ProposalDetails from "../pages/proposals/ProposalDetails";
-import ProtectedRoute from "./ProtectedRoute";
-import AdminRoute from "./AdminRoute";
+import Dashboard from "../pages/dashboard/Dashboard";
+import Payments from "../pages/dashboard/Payments";
+import Reviews from "../pages/dashboard/Reviews";
+import AdminDashboard from "../pages/admin/AdminDashboard";
+import AdminUsers from "../pages/admin/AdminUsers";
 import Projects from "../pages/projects/Projects";
 import ProjectDetails from "../pages/projects/ProjectDetails";
 import CreateProject from "../pages/projects/CreateProject";
 import EditProject from "../pages/projects/EditProject";
+import Chat from "../pages/chat/Chat";
+import Proposals from "../pages/proposals/Proposals";
+import ProposalDetails from "../pages/proposals/ProposalDetails";
+
+import Contracts from "../pages/contracts/Contracts";
+import ContractDetails from "../pages/contracts/ContractDetails";
+
+import Notifications from "../pages/notifications/Notifications";
+import Profile from "../pages/profile/Profile";
+
+import AdminDisputes from "../pages/admin/AdminDisputes";
+
+import ProtectedRoute from "./ProtectedRoute";
+import AdminRoute from "./AdminRoute";
+
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public */}
-      <Route path="/login" element={<Login />} />
+      <Route element={<AuthLayout />}>
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
-      {/* Protected */}
+        <Route
+          path="/register"
+          element={<Register />}
+        />
+      </Route>
+
       <Route element={<ProtectedRoute />}>
-      
         <Route element={<MainLayout />}>
           <Route
             path="/dashboard"
             element={<Dashboard />}
           />
-        <Route path="/proposals" element={<Proposals />} />
-        <Route
-        path="/proposals/:id"
-        element={<ProposalDetails />}
-        />
 
-          {/* Projects */}
           <Route
             path="/projects"
             element={<Projects />}
-            />
+          />
 
-            <Route
+          <Route
             path="/projects/create"
             element={<CreateProject />}
-            />
+          />
 
-            <Route
-            path="/projects/:id"
-            element={<ProjectDetails />}
-            />
-
-            <Route
+          <Route
             path="/projects/:id/edit"
             element={<EditProject />}
-            />
+          />
 
-          {/* Proposals */}
+          <Route
+            path="/projects/:id"
+            element={<ProjectDetails />}
+          />
+
           <Route
             path="/proposals"
-            element={
-              <div>
-                <h1>Proposals</h1>
-                <p>Proposals page coming soon...</p>
-              </div>
-            }
+            element={<Proposals />}
           />
 
-          {/* Contracts */}
+          <Route
+            path="/proposals/:id"
+            element={<ProposalDetails />}
+          />
+
           <Route
             path="/contracts"
-            element={
-              <div>
-                <h1>Contracts</h1>
-                <p>Contracts page coming soon...</p>
-              </div>
-            }
+            element={<Contracts />}
           />
 
-          {/* Chat */}
           <Route
-            path="/chat"
-            element={
-              <div>
-                <h1>Chat</h1>
-                <p>Chat page coming soon...</p>
-              </div>
-            }
+            path="/contracts/:id"
+            element={<ContractDetails />}
           />
 
-          {/* Notifications */}
+          <Route
+            path="/payments"
+            element={<Payments />}
+          />
+
+          <Route
+            path="/reviews"
+            element={<Reviews />}
+          />
+
           <Route
             path="/notifications"
-            element={
-              <div>
-                <h1>Notifications</h1>
-                <p>Notifications page coming soon...</p>
-              </div>
-            }
+            element={<Notifications />}
           />
 
-          {/* Profile */}
           <Route
             path="/profile"
-            element={
-              <div>
-                <h1>Profile</h1>
-                <p>Profile page coming soon...</p>
-              </div>
-            }
+            element={<Profile />}
           />
 
-          {/* Admin */}
-          <Route element={<AdminRoute />}>
+          <Route
+            path="/chat"
+            element={<Chat />}
+          />
+        </Route>
+
+        <Route element={<AdminRoute />}>
+          <Route element={<AdminLayout />}>
             <Route
-              path="/admin/users"
+              path="/admin/dashboard"
               element={
-                <div>
-                  <h1>Admin Users</h1>
-                  <p>Admin users page coming soon...</p>
-                </div>
+                <AdminDashboard />
               }
             />
 
             <Route
-              path="/disputes"
+              path="/admin/users"
               element={
-                <div>
-                  <h1>Disputes</h1>
-                  <p>Disputes page coming soon...</p>
-                </div>
+                <AdminUsers />
+              }
+            />
+
+            <Route
+              path="/admin/disputes"
+              element={
+                <AdminDisputes />
               }
             />
           </Route>
         </Route>
       </Route>
 
-      {/* Unknown route */}
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to="/dashboard"
+            replace
+          />
+        }
+      />
+
       <Route
         path="*"
-        element={<Navigate to="/dashboard" replace />}
+        element={
+          <Navigate
+            to="/dashboard"
+            replace
+          />
+        }
       />
     </Routes>
   );

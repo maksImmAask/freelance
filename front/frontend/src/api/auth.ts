@@ -6,6 +6,8 @@ import type {
   User,
 } from "../types/auth";
 
+export type { User };
+
 export const loginRequest = async (
   data: LoginData
 ): Promise<AuthResponse> => {

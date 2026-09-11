@@ -12,9 +12,9 @@ interface ProposalsResponse {
 }
 
 export const getProposalsRequest = async (): Promise<ProposalsResponse> => {
-  const response = await api.get<ProposalsResponse | Proposal[]>(
-    "/proposals/"
-  );
+  const response = await api.get<
+    ProposalsResponse | Proposal[]
+  >("/proposals/");
 
   if (Array.isArray(response.data)) {
     return {
@@ -59,12 +59,6 @@ export const updateProposalRequest = async (
   );
 
   return response.data;
-};
-
-export const deleteProposalRequest = async (
-  id: number
-): Promise<void> => {
-  await api.delete(`/proposals/${id}/`);
 };
 
 export const acceptProposalRequest = async (
