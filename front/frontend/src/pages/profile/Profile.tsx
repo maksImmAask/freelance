@@ -1,35 +1,17 @@
-import React from "react";
-
+import { useEffect, useState } from "react";
 import {
-  Alert,
-  Avatar,
   Button,
   Card,
-  Col,
-  Descriptions,
-  Divider,
   Form,
   Input,
   InputNumber,
-  Row,
   Spin,
-  Tag,
   Typography,
   message,
 } from "antd";
+import { EditOutlined, SaveOutlined } from "@ant-design/icons";
 
-import {
-  EditOutlined,
-  UserOutlined,
-  SaveOutlined,
-} from "@ant-design/icons";
-
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-
+import { useAuthStore } from "../../store/authStore";
 import {
   getClientProfileRequest,
   getFreelancerProfileRequest,
@@ -37,238 +19,173 @@ import {
   updateFreelancerProfileRequest,
 } from "../../api/users";
 
-import {
-  useAuthStore,
-} from "../../store/authStore";
+import type {
+  ClientProfile,
+  FreelancerProfile,
+} from "../../types/user";
 
-const {
-  Title,
-  Text,
-} = Typography;
-
-interface FreelancerFormValues {
-  bio: string;
-  specialization: string;
-  hourly_rate: number | null;
-  experience_years: number;
-}
-
-interface ClientFormValues {
-  company_name: string;
-  bio: string;
-}
+const { Title, Text } = Typography;
+const { TextArea } = Input;
 
 export default function Profile() {
-  const user =
-    useAuthStore(
-      (state) => state.user
-    );
+  const user = useAuthStore((state) => state.user);
 
-  const queryClient =
-    useQueryClient();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
 
-  const [
-    editing,
-    setEditing,
-  ] = React.useState(false);
+  const [freelancerProfile, setFreelancerProfile] =
+    useState<FreelancerProfile | null>(null);
 
-  const [
-    freelancerForm,
-  ] =
-    Form.useForm<FreelancerFormValues>();
+  const [clientProfile, setClientProfile] =
+    useState<ClientProfile | null>(null);
 
-  const [
-    clientForm,
-  ] =
-    Form.useForm<ClientFormValues>();
+  const [form] = Form.useForm();
 
-  const isFreelancer =
-    user?.role ===
-    "FREELANCER";
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-  const isClient =
-    user?.role ===
-    "CLIENT";
+      if (user.role === "ADMIN") {
+        setLoading(false);
+        return;
+      }
 
-  const freelancerQuery =
-    useQuery({
-      queryKey: [
-        "freelancer-profile",
-      ],
-      queryFn:
-        getFreelancerProfileRequest,
-      enabled:
-        isFreelancer,
-    });
+      setLoading(true);
 
-  const clientQuery =
-    useQuery({
-      queryKey: [
-        "client-profile",
-      ],
-      queryFn:
-        getClientProfileRequest,
-      enabled:
-        isClient,
-    });
+      try {
+        if (user.role === "FREELANCER") {
+          const profile =
+            await getFreelancerProfileRequest();
 
-  React.useEffect(() => {
-    if (
-      freelancerQuery.data &&
-      isFreelancer
-    ) {
-      freelancerForm.setFieldsValue({
-        bio:
-          freelancerQuery.data.bio,
+          setFreelancerProfile(profile);
+
+          form.setFieldsValue({
+            bio: profile.bio,
+            specialization:
+              profile.specialization,
+            hourly_rate:
+              profile.hourly_rate
+                ? Number(profile.hourly_rate)
+                : null,
+            experience_years:
+              profile.experience_years,
+          });
+        }
+
+        if (user.role === "CLIENT") {
+          const profile =
+            await getClientProfileRequest();
+
+          setClientProfile(profile);
+
+          form.setFieldsValue({
+            company_name:
+              profile.company_name,
+            bio: profile.bio,
+          });
+        }
+      } catch {
+        message.error(
+          "Не удалось загрузить профиль"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, [user, form]);
+
+  const handleEdit = () => {
+    setEditing(true);
+  };
+
+  const handleCancel = () => {
+    if (freelancerProfile) {
+      form.setFieldsValue({
+        bio: freelancerProfile.bio,
         specialization:
-          freelancerQuery.data
-            .specialization,
+          freelancerProfile.specialization,
         hourly_rate:
-          freelancerQuery.data
-            .hourly_rate
-            ? Number(
-                freelancerQuery.data
-                  .hourly_rate
-              )
+          freelancerProfile.hourly_rate
+            ? Number(freelancerProfile.hourly_rate)
             : null,
         experience_years:
-          freelancerQuery.data
-            .experience_years,
+          freelancerProfile.experience_years,
       });
     }
-  }, [
-    freelancerQuery.data,
-    isFreelancer,
-    freelancerForm,
-  ]);
 
-  React.useEffect(() => {
-    if (
-      clientQuery.data &&
-      isClient
-    ) {
-      clientForm.setFieldsValue({
+    if (clientProfile) {
+      form.setFieldsValue({
         company_name:
-          clientQuery.data
-            .company_name,
-        bio:
-          clientQuery.data.bio,
+          clientProfile.company_name,
+        bio: clientProfile.bio,
       });
     }
-  }, [
-    clientQuery.data,
-    isClient,
-    clientForm,
-  ]);
 
-  const updateFreelancerMutation =
-    useMutation({
-      mutationFn:
-        updateFreelancerProfileRequest,
+    setEditing(false);
+  };
 
-      onSuccess: () => {
-        message.success(
-          "Профиль обновлён"
-        );
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
 
-        queryClient.invalidateQueries({
-          queryKey: [
-            "freelancer-profile",
-          ],
-        });
+      setSaving(true);
 
-        setEditing(false);
-      },
+      if (user?.role === "FREELANCER") {
+        const updated =
+          await updateFreelancerProfileRequest({
+            bio: values.bio,
+            specialization:
+              values.specialization,
+            hourly_rate:
+              values.hourly_rate === null ||
+              values.hourly_rate === undefined
+                ? null
+                : String(values.hourly_rate),
+            experience_years:
+              values.experience_years,
+          });
 
-      onError: () => {
-        message.error(
-          "Не удалось обновить профиль"
-        );
-      },
-    });
+        setFreelancerProfile(updated);
+      }
 
-  const updateClientMutation =
-    useMutation({
-      mutationFn:
-        updateClientProfileRequest,
+      if (user?.role === "CLIENT") {
+        const updated =
+          await updateClientProfileRequest({
+            company_name:
+              values.company_name,
+            bio: values.bio,
+          });
 
-      onSuccess: () => {
-        message.success(
-          "Профиль обновлён"
-        );
+        setClientProfile(updated);
+      }
 
-        queryClient.invalidateQueries({
-          queryKey: [
-            "client-profile",
-          ],
-        });
+      message.success(
+        "Профиль успешно обновлён"
+      );
 
-        setEditing(false);
-      },
-
-      onError: () => {
-        message.error(
-          "Не удалось обновить профиль"
-        );
-      },
-    });
-
-  const loading =
-    freelancerQuery.isLoading ||
-    clientQuery.isLoading;
-
-  const error =
-    freelancerQuery.isError ||
-    clientQuery.isError;
-
-  const handleFreelancerSubmit =
-    async (
-      values: FreelancerFormValues
-    ) => {
-      updateFreelancerMutation.mutate({
-        bio: values.bio,
-        specialization:
-          values.specialization,
-        hourly_rate:
-          values.hourly_rate ===
-          null
-            ? "0"
-            : String(
-                values.hourly_rate
-              ),
-        experience_years:
-          values.experience_years,
-      });
-    };
-
-  const handleClientSubmit =
-    async (
-      values: ClientFormValues
-    ) => {
-      updateClientMutation.mutate({
-        company_name:
-          values.company_name,
-        bio: values.bio,
-      });
-    };
-
-  if (!user) {
-    return (
-      <Alert
-        type="error"
-        message="Пользователь не найден"
-      />
-    );
-  }
+      setEditing(false);
+    } catch {
+      message.error(
+        "Не удалось сохранить профиль"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
       <div
         style={{
           display: "flex",
-          justifyContent:
-            "center",
-          padding: 80,
+          justifyContent: "center",
+          padding: 48,
         }}
       >
         <Spin size="large" />
@@ -276,340 +193,148 @@ export default function Profile() {
     );
   }
 
-  if (error) {
-    return (
-      <Alert
-        type="error"
-        message="Не удалось загрузить профиль"
-        description="Проверьте profile API на Django."
-      />
-    );
-  }
-
   return (
     <div>
-      <Card>
-        <Row
-          gutter={[
-            24,
-            24,
-          ]}
-          align="middle"
-        >
-          <Col>
-            <Avatar
-              size={100}
-              src={user.avatar || undefined}
-              icon={
-                <UserOutlined />
-              }
-            />
-          </Col>
-
-          <Col flex="1">
-            <Title
-              level={2}
-              style={{
-                margin: 0,
-              }}
-            >
-              {user.username}
-            </Title>
-
-            <Text type="secondary">
-              {user.email}
-            </Text>
-
-            <div
-              style={{
-                marginTop: 10,
-              }}
-            >
-              <Tag
-                color={
-                  user.role ===
-                  "FREELANCER"
-                    ? "blue"
-                    : user.role ===
-                      "CLIENT"
-                    ? "green"
-                    : "red"
-                }
-              >
-                {user.role}
-              </Tag>
-
-              <Tag
-                color={
-                  user.is_verified
-                    ? "green"
-                    : "orange"
-                }
-              >
-                {user.is_verified
-                  ? "Verified"
-                  : "Not verified"}
-              </Tag>
-            </div>
-          </Col>
-
-          {!editing && (
-            <Col>
-              <Button
-                type="primary"
-                icon={
-                  <EditOutlined />
-                }
-                onClick={() =>
-                  setEditing(true)
-                }
-              >
-                Edit Profile
-              </Button>
-            </Col>
-          )}
-        </Row>
-      </Card>
+      <Title level={2}>
+        Profile
+      </Title>
 
       <Card
-        title={
-          isFreelancer
-            ? "Freelancer Profile"
-            : isClient
-            ? "Client Profile"
-            : "Profile"
+        title={user?.username || "User"}
+        extra={
+          user?.role !== "ADMIN" &&
+          !editing ? (
+            <Button
+              type="primary"
+              icon={<EditOutlined />}
+              onClick={handleEdit}
+            >
+              Edit
+            </Button>
+          ) : null
         }
-        style={{
-          marginTop: 24,
-        }}
       >
-        {isFreelancer &&
-          freelancerQuery.data && (
+        <Form
+          form={form}
+          layout="vertical"
+          disabled={!editing}
+        >
+          <Form.Item label="Username">
+            <Input
+              value={user?.username || ""}
+              disabled
+            />
+          </Form.Item>
+
+          <Form.Item label="Email">
+            <Input
+              value={user?.email || ""}
+              disabled
+            />
+          </Form.Item>
+
+          <Form.Item label="Role">
+            <Input
+              value={user?.role || ""}
+              disabled
+            />
+          </Form.Item>
+
+          {user?.role === "FREELANCER" && (
             <>
-              {!editing ? (
-                <Descriptions
-                  bordered
-                  column={1}
-                >
-                  <Descriptions.Item label="Specialization">
-                    {freelancerQuery.data
-                      .specialization ||
-                      "—"}
-                  </Descriptions.Item>
+              <Form.Item
+                name="specialization"
+                label="Specialization"
+                rules={[
+                  {
+                    required: true,
+                    message:
+                      "Введите специализацию",
+                  },
+                ]}
+              >
+                <Input />
+              </Form.Item>
 
-                  <Descriptions.Item label="Bio">
-                    {freelancerQuery.data
-                      .bio || "—"}
-                  </Descriptions.Item>
+              <Form.Item
+                name="bio"
+                label="Bio"
+              >
+                <TextArea rows={4} />
+              </Form.Item>
 
-                  <Descriptions.Item label="Hourly Rate">
-                    {freelancerQuery.data
-                      .hourly_rate
-                      ? `$${freelancerQuery.data.hourly_rate}/hour`
-                      : "—"}
-                  </Descriptions.Item>
+              <Form.Item
+                name="hourly_rate"
+                label="Hourly rate"
+              >
+                <InputNumber
+                  min={0}
+                  style={{
+                    width: "100%",
+                  }}
+                />
+              </Form.Item>
 
-                  <Descriptions.Item label="Experience">
-                    {
-                      freelancerQuery.data
-                        .experience_years
-                    }{" "}
-                    years
-                  </Descriptions.Item>
-                </Descriptions>
-              ) : (
-                <Form
-                  form={
-                    freelancerForm
-                  }
-                  layout="vertical"
-                  onFinish={
-                    handleFreelancerSubmit
-                  }
-                >
-                  <Form.Item
-                    name="specialization"
-                    label="Specialization"
-                    rules={[
-                      {
-                        required: true,
-                        message:
-                          "Введите специализацию",
-                      },
-                    ]}
-                  >
-                    <Input
-                      placeholder="Frontend Developer"
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="bio"
-                    label="Bio"
-                  >
-                    <Input.TextArea
-                      rows={5}
-                      placeholder="Расскажите о себе..."
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="hourly_rate"
-                    label="Hourly Rate"
-                    rules={[
-                      {
-                        type: "number",
-                        min: 0,
-                        message:
-                          "Цена не может быть отрицательной",
-                      },
-                    ]}
-                  >
-                    <InputNumber
-                      style={{
-                        width: "100%",
-                      }}
-                      min={0}
-                      precision={2}
-                      prefix="$"
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="experience_years"
-                    label="Experience"
-                    rules={[
-                      {
-                        required: true,
-                        message:
-                          "Введите опыт",
-                      },
-                    ]}
-                  >
-                    <InputNumber
-                      style={{
-                        width: "100%",
-                      }}
-                      min={0}
-                      max={100}
-                    />
-                  </Form.Item>
-
-                  <Divider />
-
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={
-                      <SaveOutlined />
-                    }
-                    loading={
-                      updateFreelancerMutation.isPending
-                    }
-                  >
-                    Save Changes
-                  </Button>
-
-                  <Button
-                    style={{
-                      marginLeft: 8,
-                    }}
-                    onClick={() =>
-                      setEditing(false)
-                    }
-                  >
-                    Cancel
-                  </Button>
-                </Form>
-              )}
+              <Form.Item
+                name="experience_years"
+                label="Experience years"
+              >
+                <InputNumber
+                  min={0}
+                  style={{
+                    width: "100%",
+                  }}
+                />
+              </Form.Item>
             </>
           )}
 
-        {isClient &&
-          clientQuery.data && (
+          {user?.role === "CLIENT" && (
             <>
-              {!editing ? (
-                <Descriptions
-                  bordered
-                  column={1}
-                >
-                  <Descriptions.Item label="Company">
-                    {clientQuery.data
-                      .company_name ||
-                      "—"}
-                  </Descriptions.Item>
+              <Form.Item
+                name="company_name"
+                label="Company name"
+              >
+                <Input />
+              </Form.Item>
 
-                  <Descriptions.Item label="Bio">
-                    {clientQuery.data
-                      .bio || "—"}
-                  </Descriptions.Item>
-                </Descriptions>
-              ) : (
-                <Form
-                  form={
-                    clientForm
-                  }
-                  layout="vertical"
-                  onFinish={
-                    handleClientSubmit
-                  }
-                >
-                  <Form.Item
-                    name="company_name"
-                    label="Company Name"
-                  >
-                    <Input
-                      placeholder="My Company"
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    name="bio"
-                    label="Bio"
-                  >
-                    <Input.TextArea
-                      rows={5}
-                      placeholder="Расскажите о компании..."
-                    />
-                  </Form.Item>
-
-                  <Divider />
-
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={
-                      <SaveOutlined />
-                    }
-                    loading={
-                      updateClientMutation.isPending
-                    }
-                  >
-                    Save Changes
-                  </Button>
-
-                  <Button
-                    style={{
-                      marginLeft: 8,
-                    }}
-                    onClick={() =>
-                      setEditing(false)
-                    }
-                  >
-                    Cancel
-                  </Button>
-                </Form>
-              )}
+              <Form.Item
+                name="bio"
+                label="Bio"
+              >
+                <TextArea rows={4} />
+              </Form.Item>
             </>
           )}
 
-        {user.role ===
-          "ADMIN" && (
-          <Alert
-            type="info"
-            message="Administrator account"
-            description="Для администратора отдельные профильные поля не требуются."
-          />
+          {editing && user?.role !== "ADMIN" && (
+            <Form.Item>
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                loading={saving}
+                onClick={handleSave}
+              >
+                Save
+              </Button>
+
+              <Button
+                style={{
+                  marginLeft: 8,
+                }}
+                onClick={handleCancel}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+            </Form.Item>
+          )}
+        </Form>
+
+        {user?.role === "ADMIN" && (
+          <Text type="secondary">
+            Admin profile editing is not available.
+          </Text>
         )}
       </Card>
     </div>

@@ -1,5 +1,4 @@
 import api from "./axios";
-
 import type {
   Dispute,
   DisputeFormData,
@@ -12,33 +11,35 @@ interface DisputesResponse {
   results: Dispute[];
 }
 
+const normalizeResponse = (
+  data: DisputesResponse | Dispute[]
+): DisputesResponse => {
+  if (Array.isArray(data)) {
+    return {
+      count: data.length,
+      next: null,
+      previous: null,
+      results: data,
+    };
+  }
+
+  return data;
+};
+
 export const getDisputesRequest =
   async (): Promise<DisputesResponse> => {
-    const response =
-      await api.get<
-        DisputesResponse | Dispute[]
-      >("/disputes/");
+    const response = await api.get<
+      DisputesResponse | Dispute[]
+    >("/disputes/");
 
-    if (Array.isArray(response.data)) {
-      return {
-        count: response.data.length,
-        next: null,
-        previous: null,
-        results: response.data,
-      };
-    }
-
-    return response.data;
+    return normalizeResponse(response.data);
   };
 
 export const getDisputeRequest =
-  async (
-    id: number
-  ): Promise<Dispute> => {
-    const response =
-      await api.get<Dispute>(
-        `/disputes/${id}/`
-      );
+  async (id: number): Promise<Dispute> => {
+    const response = await api.get<Dispute>(
+      `/disputes/${id}/`
+    );
 
     return response.data;
   };
@@ -47,23 +48,19 @@ export const createDisputeRequest =
   async (
     data: DisputeFormData
   ): Promise<Dispute> => {
-    const response =
-      await api.post<Dispute>(
-        "/disputes/",
-        data
-      );
+    const response = await api.post<Dispute>(
+      "/disputes/",
+      data
+    );
 
     return response.data;
   };
 
 export const startDisputeReviewRequest =
-  async (
-    id: number
-  ): Promise<Dispute> => {
-    const response =
-      await api.post<Dispute>(
-        `/disputes/${id}/start_review/`
-      );
+  async (id: number): Promise<Dispute> => {
+    const response = await api.post<Dispute>(
+      `/disputes/${id}/start_review/`
+    );
 
     return response.data;
   };
@@ -73,11 +70,12 @@ export const resolveDisputeClientRequest =
     id: number,
     resolution: string
   ): Promise<Dispute> => {
-    const response =
-      await api.post<Dispute>(
-        `/disputes/${id}/resolve_client/`,
-        { resolution }
-      );
+    const response = await api.post<Dispute>(
+      `/disputes/${id}/resolve_client/`,
+      {
+        resolution,
+      }
+    );
 
     return response.data;
   };
@@ -87,11 +85,12 @@ export const resolveDisputeFreelancerRequest =
     id: number,
     resolution: string
   ): Promise<Dispute> => {
-    const response =
-      await api.post<Dispute>(
-        `/disputes/${id}/resolve_freelancer/`,
-        { resolution }
-      );
+    const response = await api.post<Dispute>(
+      `/disputes/${id}/resolve_freelancer/`,
+      {
+        resolution,
+      }
+    );
 
     return response.data;
   };
@@ -101,11 +100,12 @@ export const rejectDisputeRequest =
     id: number,
     resolution: string
   ): Promise<Dispute> => {
-    const response =
-      await api.post<Dispute>(
-        `/disputes/${id}/reject/`,
-        { resolution }
-      );
+    const response = await api.post<Dispute>(
+      `/disputes/${id}/reject/`,
+      {
+        resolution,
+      }
+    );
 
     return response.data;
   };

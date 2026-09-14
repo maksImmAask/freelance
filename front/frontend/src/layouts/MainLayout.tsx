@@ -1,23 +1,30 @@
 import {
-  AppstoreOutlined,
-  BellOutlined,
-  FileDoneOutlined,
-  FolderOpenOutlined,
-  MessageOutlined,
-  ProjectOutlined,
-  UserOutlined,
-  LogoutOutlined,
-  WalletOutlined,
-} from "@ant-design/icons";
-import {
   Avatar,
   Button,
   Layout,
   Menu,
   Typography,
 } from "antd";
-import { useMemo } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+
+import {
+  DashboardOutlined,
+  FileTextOutlined,
+  ProjectOutlined,
+  DollarOutlined,
+  StarOutlined,
+  MessageOutlined,
+  BellOutlined,
+  UserOutlined,
+  LogoutOutlined,
+  SafetyCertificateOutlined,
+} from "@ant-design/icons";
+
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
 import { useAuthStore } from "../store/authStore";
 
 const { Header, Sider, Content } = Layout;
@@ -27,184 +34,105 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore(
+    (state) => state.user
+  );
 
-  const menuItems = useMemo(() => {
-    if (!user) {
-      return [];
-    }
+  const logout = useAuthStore(
+    (state) => state.logout
+  );
 
-    if (user.role === "CLIENT") {
-      return [
-        {
-          key: "/dashboard",
-          icon: <AppstoreOutlined />,
-          label: "Dashboard",
-        },
-        {
-          key: "/projects",
-          icon: <ProjectOutlined />,
-          label: "Projects",
-        },
-        {
-          key: "/payments",
-          icon: <WalletOutlined />,
-          label: "Payments",
-        },
-        {
-          key: "/reviews",
-          icon: <FileDoneOutlined />,
-          label: "Reviews",
-        },
-        {
-          key: "/proposals",
-          icon: <FolderOpenOutlined />,
-          label: "My Proposals",
-        },
-        {
-          key: "/contracts",
-          icon: <FileDoneOutlined />,
-          label: "Contracts",
-        },
-        {
-          key: "/chat",
-          icon: <MessageOutlined />,
-          label: "Chat",
-        },
-        {
-          key: "/notifications",
-          icon: <BellOutlined />,
-          label: "Notifications",
-        },
-        {
-          key: "/profile",
-          icon: <UserOutlined />,
-          label: "Profile",
-        },
-      ];
-    }
+  const isClient = user?.role === "CLIENT";
 
-    if (user.role === "FREELANCER") {
-      return [
-        {
-          key: "/dashboard",
-          icon: <AppstoreOutlined />,
-          label: "Dashboard",
-        },
-        {
-          key: "/payments",
-          icon: <WalletOutlined />,
-          label: "Payments",
-        },
-        {
-          key: "/reviews",
-          icon: <FileDoneOutlined />,
-          label: "Reviews",
-        },
-        {
-          key: "/projects",
-          icon: <ProjectOutlined />,
-          label: "Find Projects",
-        },
-        {
-          key: "/proposals",
-          icon: <FolderOpenOutlined />,
-          label: "My Proposals",
-        },
-        {
-          key: "/contracts",
-          icon: <FileDoneOutlined />,
-          label: "My Contracts",
-        },
-        {
-          key: "/chat",
-          icon: <MessageOutlined />,
-          label: "Chat",
-        },
-        {
-          key: "/notifications",
-          icon: <BellOutlined />,
-          label: "Notifications",
-        },
-        {
-          key: "/profile",
-          icon: <UserOutlined />,
-          label: "Profile",
-        },
-      ];
-    }
+  const isFreelancer =
+    user?.role === "FREELANCER";
 
-    if (user.role === "ADMIN") {
-      return [
-        {
-          key: "/dashboard",
-          icon: <AppstoreOutlined />,
-          label: "Dashboard",
-        },
-        {
-          key: "/admin/users",
-          icon: <UserOutlined />,
-          label: "Users",
-        },
-        {
-          key: "/projects",
-          icon: <ProjectOutlined />,
-          label: "Projects",
-        },
-        {
-          key: "/contracts",
-          icon: <FileDoneOutlined />,
-          label: "Contracts",
-        },
-        {
-          key: "/disputes",
-          icon: <FolderOpenOutlined />,
-          label: "Disputes",
-        },
-        {
-          key: "/chat",
-          icon: <MessageOutlined />,
-          label: "Chat",
-        },
-        {
-          key: "/notifications",
-          icon: <BellOutlined />,
-          label: "Notifications",
-        },
-        {
-          key: "/profile",
-          icon: <UserOutlined />,
-          label: "Profile",
-        },
-      ];
-    }
+  const isAdmin = user?.role === "ADMIN";
 
-    return [];
-  }, [user]);
+  const menuItems = [
+    {
+      key: "/dashboard",
+      icon: <DashboardOutlined />,
+      label: "Dashboard",
+    },
+    {
+      key: "/projects",
+      icon: <ProjectOutlined />,
+      label: isFreelancer
+        ? "Find Projects"
+        : "Projects",
+    },
+    {
+      key: "/proposals",
+      icon: <FileTextOutlined />,
+      label: "Proposals",
+    },
+    {
+      key: "/contracts",
+      icon: <SafetyCertificateOutlined />,
+      label: "Contracts",
+    },
+    {
+      key: "/payments",
+      icon: <DollarOutlined />,
+      label: "Payments",
+    },
+    {
+      key: "/reviews",
+      icon: <StarOutlined />,
+      label: "Reviews",
+    },
+    {
+      key: "/chat",
+      icon: <MessageOutlined />,
+      label: "Chat",
+    },
+    {
+      key: "/notifications",
+      icon: <BellOutlined />,
+      label: "Notifications",
+    },
+    {
+      key: "/profile",
+      icon: <UserOutlined />,
+      label: "Profile",
+    },
+  ];
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
-
-  const currentKey =
+  const selectedKey =
     menuItems.find((item) =>
       location.pathname.startsWith(item.key)
     )?.key || "/dashboard";
 
+  const handleLogout = () => {
+    logout();
+
+    navigate("/login", {
+      replace: true,
+    });
+  };
+
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider breakpoint="lg" collapsedWidth="0">
+    <Layout
+      style={{
+        minHeight: "100vh",
+      }}
+    >
+      <Sider
+        theme="dark"
+        width={240}
+        collapsible={false}
+        style={{
+          minHeight: "100vh",
+        }}
+      >
         <div
           style={{
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             color: "#fff",
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: 700,
+            padding: "20px 16px",
+            textAlign: "center",
           }}
         >
           Marketplace
@@ -213,61 +141,69 @@ export default function MainLayout() {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[currentKey]}
+          selectedKeys={[selectedKey]}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
-        />
-
-        <div
-          style={{
-            position: "absolute",
-            bottom: 20,
-            left: 20,
-            right: 20,
+          onClick={({ key }) => {
+            navigate(key);
           }}
-        >
-          <Button
-            danger
-            type="text"
-            icon={<LogoutOutlined />}
-            onClick={handleLogout}
-            style={{ color: "#fff", width: "100%" }}
-          >
-            Logout
-          </Button>
-        </div>
+        />
       </Sider>
 
-      <Layout>
+      <Layout
+        style={{
+          minWidth: 0,
+        }}
+      >
         <Header
           style={{
-            padding: "0 24px",
             background: "#fff",
+            padding: "0 24px",
             display: "flex",
-            justifyContent: "flex-end",
             alignItems: "center",
-            gap: 12,
-            borderBottom: "1px solid #eee",
+            justifyContent: "space-between",
+            gap: 16,
           }}
         >
-          <Avatar
-            src={user?.avatar || undefined}
-            icon={<UserOutlined />}
-          />
+          <Text strong>
+            {isAdmin
+              ? "Administrator"
+              : isClient
+                ? "Client"
+                : isFreelancer
+                  ? "Freelancer"
+                  : "User"}
+          </Text>
 
-          <div>
-            <Text strong>{user?.username}</Text>
-            <br />
-            <Text type="secondary">
-              {user?.role}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <Avatar
+              src={user?.avatar || undefined}
+              icon={<UserOutlined />}
+            />
+
+            <Text>
+              {user?.username || "User"}
             </Text>
+
+            <Button
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+            >
+              Logout
+            </Button>
           </div>
         </Header>
 
         <Content
           style={{
-            margin: 24,
+            padding: 24,
             minHeight: 280,
+            overflow: "auto",
           }}
         >
           <Outlet />

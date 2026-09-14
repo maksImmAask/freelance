@@ -1,10 +1,7 @@
-import React from "react";
-
+import { useEffect, useState } from "react";
 import {
-  Alert,
   Button,
   Card,
-  Descriptions,
   Empty,
   Input,
   List,
@@ -15,20 +12,15 @@ import {
   Typography,
   message,
 } from "antd";
-
 import {
   CheckOutlined,
-  EyeOutlined,
-  FileSearchOutlined,
   CloseOutlined,
+  EyeOutlined,
+  PlayCircleOutlined,
 } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-
+import { useAuthStore } from "../../store/authStore";
 import {
   getDisputesRequest,
   rejectDisputeRequest,
@@ -36,233 +28,204 @@ import {
   resolveDisputeFreelancerRequest,
   startDisputeReviewRequest,
 } from "../../api/disputes";
-
 import type {
   Dispute,
   DisputeStatus,
 } from "../../types/dispute";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
+const { TextArea } = Input;
 
-const statusConfig: Record<
+const statusColors: Record<
   DisputeStatus,
-  {
-    color: string;
-    label: string;
-  }
+  string
 > = {
-  OPEN: {
-    color: "red",
-    label: "Open",
-  },
-  IN_REVIEW: {
-    color: "orange",
-    label: "In Review",
-  },
-  RESOLVED_CLIENT: {
-    color: "green",
-    label: "Resolved for Client",
-  },
-  RESOLVED_FREELANCER: {
-    color: "blue",
-    label: "Resolved for Freelancer",
-  },
-  REJECTED: {
-    color: "default",
-    label: "Rejected",
-  },
+  OPEN: "orange",
+  IN_REVIEW: "blue",
+  RESOLVED_CLIENT: "green",
+  RESOLVED_FREELANCER: "green",
+  REJECTED: "red",
+};
+
+const statusLabels: Record<
+  DisputeStatus,
+  string
+> = {
+  OPEN: "Open",
+  IN_REVIEW: "In review",
+  RESOLVED_CLIENT: "Resolved for client",
+  RESOLVED_FREELANCER: "Resolved for freelancer",
+  REJECTED: "Rejected",
 };
 
 export default function AdminDisputes() {
-  const queryClient =
-    useQueryClient();
+  const navigate = useNavigate();
 
-  const [
-    selectedDispute,
-    setSelectedDispute,
-  ] =
-    React.useState<Dispute | null>(
-      null
-    );
+  const user = useAuthStore((state) => state.user);
 
-  const [
-    resolution,
-    setResolution,
-  ] = React.useState("");
+  const [disputes, setDisputes] = useState<
+    Dispute[]
+  >([]);
 
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ["disputes"],
-    queryFn:
-      getDisputesRequest,
-  });
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] =
+    useState(false);
 
-  const startMutation =
-    useMutation({
-      mutationFn:
-        startDisputeReviewRequest,
+  const [selectedDispute, setSelectedDispute] =
+    useState<Dispute | null>(null);
 
-      onSuccess: () => {
-        message.success(
-          "Dispute moved to review"
-        );
+  const [resolution, setResolution] =
+    useState("");
 
-        queryClient.invalidateQueries({
-          queryKey: ["disputes"],
-        });
-      },
+  const loadDisputes = async () => {
+    setLoading(true);
 
-      onError: () => {
-        message.error(
-          "Не удалось начать рассмотрение"
-        );
-      },
-    });
+    try {
+      const response =
+        await getDisputesRequest();
 
-  const resolveClientMutation =
-    useMutation({
-      mutationFn: ({
-        id,
-        text,
-      }: {
-        id: number;
-        text: string;
-      }) =>
-        resolveDisputeClientRequest(
-          id,
-          text
-        ),
+      setDisputes(response.results);
+    } catch {
+      message.error(
+        "Не удалось загрузить disputes"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      onSuccess: () => {
-        message.success(
-          "Dispute resolved for client"
-        );
+  useEffect(() => {
+    if (!user) {
+      navigate("/login", {
+        replace: true,
+      });
 
-        setSelectedDispute(
-          null
-        );
-        setResolution("");
+      return;
+    }
 
-        queryClient.invalidateQueries({
-          queryKey: ["disputes"],
-        });
-      },
+    if (user.role !== "ADMIN") {
+      navigate("/dashboard", {
+        replace: true,
+      });
 
-      onError: () => {
-        message.error(
-          "Не удалось разрешить спор"
-        );
-      },
-    });
+      return;
+    }
 
-  const resolveFreelancerMutation =
-    useMutation({
-      mutationFn: ({
-        id,
-        text,
-      }: {
-        id: number;
-        text: string;
-      }) =>
-        resolveDisputeFreelancerRequest(
-          id,
-          text
-        ),
-
-      onSuccess: () => {
-        message.success(
-          "Dispute resolved for freelancer"
-        );
-
-        setSelectedDispute(
-          null
-        );
-        setResolution("");
-
-        queryClient.invalidateQueries({
-          queryKey: ["disputes"],
-        });
-      },
-
-      onError: () => {
-        message.error(
-          "Не удалось разрешить спор"
-        );
-      },
-    });
-
-  const rejectMutation =
-    useMutation({
-      mutationFn: ({
-        id,
-        text,
-      }: {
-        id: number;
-        text: string;
-      }) =>
-        rejectDisputeRequest(
-          id,
-          text
-        ),
-
-      onSuccess: () => {
-        message.success(
-          "Dispute rejected"
-        );
-
-        setSelectedDispute(
-          null
-        );
-        setResolution("");
-
-        queryClient.invalidateQueries({
-          queryKey: ["disputes"],
-        });
-      },
-
-      onError: () => {
-        message.error(
-          "Не удалось отклонить спор"
-        );
-      },
-    });
-
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent:
-            "center",
-          padding: 80,
-        }}
-      >
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Alert
-        type="error"
-        message="Не удалось загрузить disputes"
-      />
-    );
-  }
-
-  const disputes =
-    data?.results ?? [];
+    loadDisputes();
+  }, [user, navigate]);
 
   const closeModal = () => {
-    setSelectedDispute(
-      null
-    );
+    setSelectedDispute(null);
     setResolution("");
   };
+
+  const runAction = async (
+    action: () => Promise<Dispute>,
+    successText: string
+  ) => {
+    setActionLoading(true);
+
+    try {
+      await action();
+
+      message.success(successText);
+      closeModal();
+      await loadDisputes();
+    } catch {
+      message.error(
+        "Не удалось выполнить действие"
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartReview = () => {
+    if (!selectedDispute) {
+      return;
+    }
+
+    runAction(
+      () =>
+        startDisputeReviewRequest(
+          selectedDispute.id
+        ),
+      "Dispute отправлен на рассмотрение"
+    );
+  };
+
+  const handleResolveClient = () => {
+    if (!selectedDispute) {
+      return;
+    }
+
+    if (!resolution.trim()) {
+      message.warning(
+        "Введите решение"
+      );
+
+      return;
+    }
+
+    runAction(
+      () =>
+        resolveDisputeClientRequest(
+          selectedDispute.id,
+          resolution.trim()
+        ),
+      "Dispute решён в пользу клиента"
+    );
+  };
+
+  const handleResolveFreelancer = () => {
+    if (!selectedDispute) {
+      return;
+    }
+
+    if (!resolution.trim()) {
+      message.warning(
+        "Введите решение"
+      );
+
+      return;
+    }
+
+    runAction(
+      () =>
+        resolveDisputeFreelancerRequest(
+          selectedDispute.id,
+          resolution.trim()
+        ),
+      "Dispute решён в пользу freelancer"
+    );
+  };
+
+  const handleReject = () => {
+    if (!selectedDispute) {
+      return;
+    }
+
+    if (!resolution.trim()) {
+      message.warning(
+        "Введите решение"
+      );
+
+      return;
+    }
+
+    runAction(
+      () =>
+        rejectDisputeRequest(
+          selectedDispute.id,
+          resolution.trim()
+        ),
+      "Dispute отклонён"
+    );
+  };
+
+  if (!user || user.role !== "ADMIN") {
+    return null;
+  }
 
   return (
     <div>
@@ -271,267 +234,243 @@ export default function AdminDisputes() {
       </Title>
 
       <Text type="secondary">
-        Управление спорами между
-        клиентами и фрилансерами.
+        Управление спорами между клиентами и
+        freelancer-ами
       </Text>
 
-      <Card
-        style={{
-          marginTop: 24,
-        }}
-      >
-        {disputes.length === 0 ? (
-          <Empty description="Споров пока нет" />
+      <div style={{ marginTop: 24 }}>
+        {loading ? (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              padding: 48,
+            }}
+          >
+            <Spin size="large" />
+          </div>
+        ) : disputes.length === 0 ? (
+          <Empty description="Disputes не найдены" />
         ) : (
           <List
+            grid={{
+              gutter: 16,
+              xs: 1,
+              sm: 1,
+              md: 2,
+              lg: 3,
+            }}
             dataSource={disputes}
-            renderItem={(
-              dispute
-            ) => {
-              const status =
-                statusConfig[
-                  dispute.status
-                ];
-
-              return (
-                <List.Item
-                  actions={[
-                    <Button
-                      icon={
-                        <EyeOutlined />
-                      }
-                      onClick={() =>
-                        setSelectedDispute(
-                          dispute
-                        )
+            renderItem={(dispute) => (
+              <List.Item>
+                <Card
+                  title={`Dispute #${dispute.id}`}
+                  extra={
+                    <Tag
+                      color={
+                        statusColors[
+                          dispute.status
+                        ]
                       }
                     >
-                      View
+                      {
+                        statusLabels[
+                          dispute.status
+                        ]
+                      }
+                    </Tag>
+                  }
+                  actions={[
+                    <Button
+                      key="view"
+                      type="link"
+                      icon={<EyeOutlined />}
+                      onClick={() => {
+                        setSelectedDispute(
+                          dispute
+                        );
+                        setResolution(
+                          dispute.resolution || ""
+                        );
+                      }}
+                    >
+                      Open
                     </Button>,
                   ]}
                 >
-                  <List.Item.Meta
-                    title={
-                      <Space>
-                        <Text strong>
-                          Dispute #
-                          {
-                            dispute.id
-                          }
-                        </Text>
+                  <Space
+                    direction="vertical"
+                    size={8}
+                    style={{ width: "100%" }}
+                  >
+                    <Text>
+                      Contract:{" "}
+                      {dispute.contract}
+                    </Text>
 
-                        <Tag
-                          color={
-                            status.color
-                          }
-                        >
-                          {
-                            status.label
-                          }
-                        </Tag>
-                      </Space>
-                    }
-                    description={
-                      <>
-                        Contract #
-                        {
-                          dispute.contract
-                        }
-                        {" • "}
-                        Opened by #
-                        {
-                          dispute.opened_by
-                        }
-                      </>
-                    }
-                  />
-                </List.Item>
-              );
-            }}
+                    <Text>
+                      Opened by:{" "}
+                      {dispute.opened_by}
+                    </Text>
+
+                    <Paragraph
+                      ellipsis={{
+                        rows: 3,
+                      }}
+                    >
+                      {dispute.reason}
+                    </Paragraph>
+
+                    <Text type="secondary">
+                      {new Date(
+                        dispute.created_at
+                      ).toLocaleString()}
+                    </Text>
+                  </Space>
+                </Card>
+              </List.Item>
+            )}
           />
         )}
-      </Card>
+      </div>
 
       <Modal
+        open={!!selectedDispute}
         title={
           selectedDispute
             ? `Dispute #${selectedDispute.id}`
             : "Dispute"
         }
-        open={
-          !!selectedDispute
-        }
         onCancel={closeModal}
         footer={null}
-        width={650}
+        width={700}
       >
         {selectedDispute && (
           <Space
             direction="vertical"
-            size="large"
-            style={{
-              width: "100%",
-            }}
+            size={16}
+            style={{ width: "100%" }}
           >
-            <Descriptions
-              bordered
-              column={1}
-            >
-              <Descriptions.Item label="Contract">
-                #
-                {
-                  selectedDispute.contract
-                }
-              </Descriptions.Item>
+            <div>
+              <Text strong>
+                Status:{" "}
+              </Text>
 
-              <Descriptions.Item label="Opened By">
-                #
-                {
-                  selectedDispute.opened_by
-                }
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Status">
-                <Tag
-                  color={
-                    statusConfig[
-                      selectedDispute
-                        .status
-                    ].color
-                  }
-                >
-                  {
-                    statusConfig[
-                      selectedDispute
-                        .status
-                    ].label
-                  }
-                </Tag>
-              </Descriptions.Item>
-
-              <Descriptions.Item label="Reason">
-                {
-                  selectedDispute.reason
-                }
-              </Descriptions.Item>
-
-              {selectedDispute.resolution && (
-                <Descriptions.Item label="Resolution">
-                  {
-                    selectedDispute.resolution
-                  }
-                </Descriptions.Item>
-              )}
-            </Descriptions>
-
-            {selectedDispute.status ===
-              "OPEN" && (
-              <Button
-                type="primary"
-                icon={
-                  <FileSearchOutlined />
-                }
-                loading={
-                  startMutation.isPending
-                }
-                onClick={() =>
-                  startMutation.mutate(
-                    selectedDispute.id
-                  )
+              <Tag
+                color={
+                  statusColors[
+                    selectedDispute.status
+                  ]
                 }
               >
-                Start Review
-              </Button>
-            )}
+                {
+                  statusLabels[
+                    selectedDispute.status
+                  ]
+                }
+              </Tag>
+            </div>
 
-            {selectedDispute.status ===
-              "IN_REVIEW" && (
-              <>
-                <Input.TextArea
-                  rows={5}
-                  value={
-                    resolution
-                  }
-                  onChange={(event) =>
-                    setResolution(
-                      event.target
-                        .value
-                    )
-                  }
-                  placeholder="Write the resolution..."
-                />
+            <div>
+              <Text strong>
+                Contract:
+              </Text>{" "}
+              {selectedDispute.contract}
+            </div>
 
-                <Space wrap>
+            <div>
+              <Text strong>
+                Opened by:
+              </Text>{" "}
+              {selectedDispute.opened_by}
+            </div>
+
+            <div>
+              <Text strong>
+                Reason:
+              </Text>
+
+              <Paragraph>
+                {selectedDispute.reason}
+              </Paragraph>
+            </div>
+
+            <div>
+              <Text strong>
+                Resolution:
+              </Text>
+
+              <TextArea
+                rows={4}
+                value={resolution}
+                onChange={(event) => {
+                  setResolution(
+                    event.target.value
+                  );
+                }}
+                placeholder="Введите решение по спору"
+                disabled={
+                  selectedDispute.status ===
+                    "RESOLVED_CLIENT" ||
+                  selectedDispute.status ===
+                    "RESOLVED_FREELANCER" ||
+                  selectedDispute.status ===
+                    "REJECTED"
+                }
+              />
+            </div>
+
+            <Space wrap>
+              {selectedDispute.status ===
+                "OPEN" && (
+                <Button
+                  type="primary"
+                  icon={<PlayCircleOutlined />}
+                  loading={actionLoading}
+                  onClick={handleStartReview}
+                >
+                  Start review
+                </Button>
+              )}
+
+              {(selectedDispute.status ===
+                "OPEN" ||
+                selectedDispute.status ===
+                  "IN_REVIEW") && (
+                <>
                   <Button
                     type="primary"
-                    icon={
-                      <CheckOutlined />
-                    }
-                    loading={
-                      resolveClientMutation.isPending
-                    }
-                    disabled={
-                      !resolution.trim()
-                    }
-                    onClick={() =>
-                      resolveClientMutation.mutate(
-                        {
-                          id: selectedDispute.id,
-                          text: resolution,
-                        }
-                      )
+                    icon={<CheckOutlined />}
+                    loading={actionLoading}
+                    onClick={
+                      handleResolveClient
                     }
                   >
-                    Resolve for Client
+                    Resolve client
                   </Button>
 
                   <Button
-                    icon={
-                      <CheckOutlined />
-                    }
-                    loading={
-                      resolveFreelancerMutation.isPending
-                    }
-                    disabled={
-                      !resolution.trim()
-                    }
-                    onClick={() =>
-                      resolveFreelancerMutation.mutate(
-                        {
-                          id: selectedDispute.id,
-                          text: resolution,
-                        }
-                      )
+                    type="primary"
+                    icon={<CheckOutlined />}
+                    loading={actionLoading}
+                    onClick={
+                      handleResolveFreelancer
                     }
                   >
-                    Resolve for Freelancer
+                    Resolve freelancer
                   </Button>
 
                   <Button
                     danger
-                    icon={
-                      <CloseOutlined />
-                    }
-                    loading={
-                      rejectMutation.isPending
-                    }
-                    disabled={
-                      !resolution.trim()
-                    }
-                    onClick={() =>
-                      rejectMutation.mutate(
-                        {
-                          id: selectedDispute.id,
-                          text: resolution,
-                        }
-                      )
-                    }
+                    icon={<CloseOutlined />}
+                    loading={actionLoading}
+                    onClick={handleReject}
                   >
                     Reject
                   </Button>
-                </Space>
-              </>
-            )}
+                </>
+              )}
+            </Space>
           </Space>
         )}
       </Modal>
